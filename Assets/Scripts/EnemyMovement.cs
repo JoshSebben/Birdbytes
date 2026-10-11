@@ -5,17 +5,33 @@ using UnityEngine.AI;
 
 public class EnemyMovement : MonoBehaviour
 {
-    public float moveSpeed = 5f;
+    [Header("Movement")]
     public float turnSpeed = 360f;
     public float rayLength = 1f;
+    [SerializeField] private float patrolSpeed = 3f;
+    [SerializeField] private float chaseSpeed = 4f;
 
     [Header("Patrol")]
     [SerializeField] private Transform[] patrolPoints;
     [SerializeField] private float patrolWaitTime = 2f;
     [SerializeField] private float stopAtDistance = 0.5f;
 
+    [Header("Chase")]
+    [SerializeField] private float attackRange = 1.1f; // 1.1 is the grid right next to the enemy
+
+    enum State { Patrol, Chase }
+    State state = State.Patrol;
+
+    EnemyVision vision;
+    Transform player;
+
+    float moveSpeed;
     Vector3 destination;
     Quaternion targetRotation;
+
+    Vector3 lastSeenPosition;
+    bool playerVisible;
+
     int currentPatrolIndex;
     bool isWaiting;
 
@@ -24,6 +40,10 @@ public class EnemyMovement : MonoBehaviour
     {
         destination = transform.position;
         targetRotation = transform.rotation;
+        moveSpeed = patrolSpeed;
+
+        vision = GetComponent<EnemyVision>();
+        player = vision.Player.transform;
     }
 
     // Update is called once per frame
@@ -46,7 +66,83 @@ public class EnemyMovement : MonoBehaviour
         transform.position = destination;
         transform.rotation = targetRotation;
 
-        Patrol();
+        UpdateState();
+
+        if (state == State.Patrol)
+        {
+            Patrol();
+        }
+        else
+        {
+            Chase();
+        }
+    }
+
+    void UpdateState()
+    {
+        playerVisible = CanSeePlayer();
+
+        if (playerVisible)
+        {
+            lastSeenPosition = player.position;
+
+            if (state != State.Chase)
+            {
+                // Cancels patrol in progress
+                StopAllCoroutines();
+                isWaiting = false;
+
+                state = State.Chase;
+                moveSpeed = chaseSpeed;
+            }
+        }
+        else if (state == State.Chase)
+        {
+            // Lost sight (goes to where last saw player, then resumes patrol
+            if (FlatDistance(transform.position, lastSeenPosition) <= stopAtDistance)
+            {
+                state = State.Patrol;
+                moveSpeed = patrolSpeed;
+            }
+        }
+    }
+
+    bool CanSeePlayer()
+    {
+        if (state == State.Chase)
+        {
+            return vision.PlayerInSight;
+        }
+
+        return vision.PlayerDetected;
+    }
+
+    void Patrol()
+    {
+        if (isWaiting || patrolPoints.Length == 0) return;
+
+        Vector3 target = patrolPoints[currentPatrolIndex].position;
+
+        if (FlatDistance(transform.position, target) <= stopAtDistance)
+        {
+            StartCoroutine(WaitAtPatrolPoint());
+            return;
+        }
+
+        StepToward(target);
+    }
+
+    void Chase()
+    {
+        float distance = FlatDistance(transform.position, player.position);
+
+        if (playerVisible && distance <= attackRange)
+        {
+            // attack go here
+            return;
+        }
+
+        StepToward(lastSeenPosition);
     }
 
     Vector3 GetFacingDirection()
@@ -80,21 +176,6 @@ public class EnemyMovement : MonoBehaviour
         }
 
         return true;
-    }
-
-    private void Patrol()
-    {
-        if (isWaiting || patrolPoints.Length == 0) return;
-
-        Vector3 target = patrolPoints[currentPatrolIndex].position;
-
-        if (FlatDistance(transform.position, target) <= stopAtDistance)
-        {
-            StartCoroutine(WaitAtPatrolPoint());
-            return;
-        }
-
-        StepToward(target);
     }
 
     void StepToward(Vector3 target)

@@ -10,6 +10,10 @@ public class EnemyVision : MonoBehaviour
 
     public GameObject Player;
     public TMP_Text RangeText, HiddenText, AngleText, DetectedText;
+
+    public bool PlayerDetected; // In range, in cone, not hidden
+    public bool PlayerInSight; // In range and not hidden (ignore cone)
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -19,69 +23,44 @@ public class EnemyVision : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        RaycastHit hit;
-        isInAngle = false;
-        isInRange = false;
+        Vector3 origin = transform.position + new Vector3(0, 0.25f, 0);
+        Vector3 target = Player.transform.position + new Vector3(0, 0.25f, 0);
+        Vector3 toPlayer = target - origin;
+
+        // Range
+        isInRange = toPlayer.magnitude < DetectRange;
+
+        // Angle, measured on the flat ground
+        Vector3 flatToPlayer = new Vector3(toPlayer.x, 0, toPlayer.z);
+        float angle = Vector3.Angle(transform.forward, flatToPlayer);
+        isInAngle = angle < DetectAngle;
+
+        // Hidden
         isNotHidden = false;
-
-        if (Vector3.Distance(transform.position, Player.transform.position) < DetectRange)
+        RaycastHit hit;
+        if (Physics.Raycast(origin, toPlayer.normalized, out hit, DetectRange))
         {
-            isInRange = true;
-            RangeText.text = "In Range";
-            RangeText.color = Color.red;
-        }
-        else
-        {
-            RangeText.text = "Not In Range";
-            RangeText.color = Color.green;
-        }
-
-        if (Physics.Raycast(transform.position, (Player.transform.position - transform.position), out hit, Mathf.Infinity))
-        {
-            if (hit.transform == Player.transform)
+            if (hit.transform.IsChildOf(Player.transform))
             {
                 isNotHidden = true;
-                HiddenText.text = "Not Hidden";
-                HiddenText.color = Color.red;
             }
-            else
-            {
-                HiddenText.text = "Hidden";
-                HiddenText.color = Color.green;
-            }
-        }
-        else
-        {
-            HiddenText.text = "Hidden";
-            HiddenText.color = Color.green;
-        }
 
-        Vector3 side1 = Player.transform.position - transform.position;
-        Vector3 side2 = transform.forward;
-        float angle = Vector3.SignedAngle(side1, side2, Vector3.up);
+            PlayerInSight = isInRange && isNotHidden;
+            PlayerDetected = isInRange && isInAngle && isNotHidden;
 
-        if (angle < DetectAngle && angle < -1 * DetectAngle)
-        {
-            isInAngle = true;
-            AngleText.text = "In Vision Angle";
-            AngleText.color = Color.red;
+            SetLabel(RangeText, isInRange ? "In Range" : "Not In Range", isInRange);
+            SetLabel(HiddenText, isNotHidden ? "Not Hidden" : "Hidden", isNotHidden);
+            SetLabel(AngleText, isInAngle ? "In Vision Angle" : "Not In Vision Angle", isInRange);
+            SetLabel(DetectedText, PlayerDetected ? "Player Detected" : "Player Not Detected", PlayerDetected);
         }
-        else
-        {
-            AngleText.text = "Not In Vision Angle";
-            AngleText.color = Color.green;
-        }
+    }
 
-        if (isInAngle && isInRange && isNotHidden)
-        {
-            DetectedText.text = "Player Detected";
-            DetectedText.color = Color.red;
-        }
-        else
-        {
-            DetectedText.text = "Player Not Detected";
-            DetectedText.color = Color.green;
-        }
+    void SetLabel(TMP_Text label, string message, bool alert)
+    {
+        if (label == null) return;
+
+        label.text = message;
+        label.color = alert ? Color.red : Color.green;
     }
 
 }
