@@ -2490,7 +2490,7 @@ MonoBehaviour:
   - {fileID: 1539601712}
   - {fileID: 1519512876}
   - {fileID: 1391129671}
-  patrolWaitTime: 2
+  patrolWaitTime: 5
   stopAtDistance: 0.5
   attackRange: 1.1
 --- !u!54 &1362380835

@@ -260,5 +260,10 @@ public class EnemyMovement : MonoBehaviour
         currentPatrolIndex = (currentPatrolIndex + 1) % patrolPoints.Length;
         isWaiting = false;
     }
+
+    public bool IsChasing()
+    {
+        return state == State.Chase;
+    }
 }
 
