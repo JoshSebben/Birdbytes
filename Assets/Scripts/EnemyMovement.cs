@@ -138,7 +138,7 @@ public class EnemyMovement : MonoBehaviour
 
         if (playerVisible && distance <= attackRange)
         {          
-            Debug.Log("Attack reached, calling DeathScreen");
+            // Debug.Log("Attack reached, calling DeathScreen");
             DeathScreen.instance.Show();
             return;
         }

@@ -35,7 +35,7 @@ public class DeathScreen : MonoBehaviour
 
     public void Show()
     {
-        Debug.Log("Show called");
+        //Debug.Log("Show called");
 
         // The enemy calls this every frame while it stands next to the player (run once)
         if (isDead) return;
