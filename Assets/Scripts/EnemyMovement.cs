@@ -137,8 +137,9 @@ public class EnemyMovement : MonoBehaviour
         float distance = FlatDistance(transform.position, player.position);
 
         if (playerVisible && distance <= attackRange)
-        {
-            // attack go here
+        {          
+            Debug.Log("Attack reached, calling DeathScreen");
+            DeathScreen.instance.Show();
             return;
         }
 
