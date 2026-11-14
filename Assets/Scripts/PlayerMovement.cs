@@ -89,7 +89,7 @@ public class PlayerMovement : MonoBehaviour
 
         if (Physics.Raycast(myRay, out hit, rayLength))
         {
-            if (hit.collider.CompareTag("Wall"))
+            if (hit.collider.CompareTag("Wall") || hit.collider.CompareTag("Door"))
             {
                 return false;
             }

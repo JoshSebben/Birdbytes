@@ -1,11 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Not attached to anything. Any script can call ScanDatabase.HasScanned("Alien1")
-// (for example a map door that unlocks once Alien1 has been scanned).
 public static class ScanDatabase
 {
     static List<string> scannedIDs = new List<string>();
+    static List<EnemyRank> unlockedRanks = new List<EnemyRank>();
 
     public static bool HasScanned(string id)
     {
@@ -20,11 +19,24 @@ public static class ScanDatabase
         }
     }
 
-    // since the list is static, this is to reset the list everytime u play the game
+    public static bool HasRankAccess(EnemyRank rank)
+    {
+        return unlockedRanks.Contains(rank);
+    }
+
+    public static void UnlockRank(EnemyRank rank)
+    {
+        if (!HasRankAccess(rank))
+        {
+            unlockedRanks.Add(rank);
+        }
+    }
+
+    // Since the list is static, this is to reset the list every play session
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetData()
     {
         scannedIDs.Clear();
+        unlockedRanks.Clear();
     }
 }
-
