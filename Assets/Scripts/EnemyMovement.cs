@@ -18,6 +18,8 @@ public class EnemyMovement : MonoBehaviour
     public float rayLength = 1f;
     [SerializeField] private float attackRange = 1.1f;   // 1.1 = the cell right next to the enemy
     [SerializeField] private float alertRadius = 8f;     // how far an alert reaches other enemies
+    [SerializeField] private float detectAngle = 75f;    // half-angle of the view cone (keep it under 135 so enemies stay blind from behind)
+    [SerializeField] private float giveUpTime = 4f;      // chasing: give up if we get no closer to where the player was last seen for this long
 
     [Header("Backup (Low-Rank)")]
     [SerializeField] private float backupMinTime = 15f;  // backup should arrive between these many seconds
@@ -63,6 +65,10 @@ public class EnemyMovement : MonoBehaviour
     Vector3 lastSeenPosition;
     bool playerVisible;
     float alertProgress;
+    Vector3 suspicionPosition;   // where the player was last noticed while the alert meter fills
+    Vector3 progressTarget;      // used to notice when a chase is getting nowhere
+    float bestDistance;
+    float noProgressTimer;
     bool hasCalledBackup;
 
     int currentPatrolIndex;
@@ -117,32 +123,32 @@ public class EnemyMovement : MonoBehaviour
         switch (rank)
         {
             case EnemyRank.Low:
-                detectRange = 4f;
-                alertTime = 0.5f;
+                detectRange = 5f;
+                alertTime = 0.4f;
                 patrolSpeed = 2.5f;
                 chaseSpeed = 4f;
                 callsBackup = true;
                 break;
 
             case EnemyRank.Mid:
-                detectRange = 9f;
-                alertTime = 2f;
+                detectRange = 10f;
+                alertTime = 1.5f;
                 patrolSpeed = 2.5f;
                 chaseSpeed = 4f;
                 canRookDash = true;
                 break;
 
             case EnemyRank.High:
-                detectRange = 6f;
-                alertTime = 1f;
+                detectRange = 7f;
+                alertTime = 0.8f;
                 patrolSpeed = 4f;
                 chaseSpeed = 6.5f;
                 canGrab = true;
                 break;
 
             case EnemyRank.Captain:
-                detectRange = 7f;
-                alertTime = 0.8f;
+                detectRange = 8f;
+                alertTime = 0.6f;
                 patrolSpeed = 3.5f;
                 chaseSpeed = 5f;
                 canShortDash = true;
@@ -151,11 +157,13 @@ public class EnemyMovement : MonoBehaviour
         }
 
         vision.DetectRange = detectRange;
+        vision.DetectAngle = detectAngle;
     }
 
     void Update()
     {
         UpdateAlert();
+        CheckChaseProgress();
         UpdateTimers();
 
         // Glide toward the current target position and rotation
@@ -190,6 +198,13 @@ public class EnemyMovement : MonoBehaviour
         }
 
         UpdateState();
+
+        // Noticed something: stop walking and look toward where the player was seen
+        if (state == State.Patrol && alertProgress > 0f)
+        {
+            LookToward(suspicionPosition);
+            return;
+        }
 
         if (state == State.Patrol)
         {
@@ -227,10 +242,12 @@ public class EnemyMovement : MonoBehaviour
         if (vision.PlayerDetected)
         {
             alertProgress += Time.deltaTime;
+            suspicionPosition = player.position;
         }
         else
         {
-            alertProgress = Mathf.Max(0f, alertProgress - Time.deltaTime);
+            // Drains slower than it fills, so a brief glimpse still counts
+            alertProgress = Mathf.Max(0f, alertProgress - Time.deltaTime * 0.5f);
         }
 
         if (vision.PlayerDetected && alertProgress >= alertTime)
@@ -248,9 +265,11 @@ public class EnemyMovement : MonoBehaviour
         }
         isWaiting = false;
 
+        Debug.Log(name + " is now chasing");
+
         state = State.Chase;
         moveSpeed = chaseSpeed;
-        lastSeenPosition = position;
+        lastSeenPosition = SnapToGrid(position);
         alertProgress = 0f;
 
         if (shout)
@@ -272,7 +291,7 @@ public class EnemyMovement : MonoBehaviour
         {
             if (!playerVisible)
             {
-                lastSeenPosition = position;
+                lastSeenPosition = SnapToGrid(position);
             }
 
             return;
@@ -374,6 +393,28 @@ public class EnemyMovement : MonoBehaviour
         return state == State.Chase;
     }
 
+    // Turns to the nearest of the four grid directions toward a position
+    void LookToward(Vector3 position)
+    {
+        Vector3 offset = position - transform.position;
+        offset.y = 0;
+
+        if (offset.magnitude < 0.1f) return;
+
+        Vector3 direction;
+
+        if (Mathf.Abs(offset.x) >= Mathf.Abs(offset.z))
+        {
+            direction = new Vector3(Mathf.Sign(offset.x), 0, 0);
+        }
+        else
+        {
+            direction = new Vector3(0, 0, Mathf.Sign(offset.z));
+        }
+
+        FaceDirection(direction);
+    }
+
     void UpdateState()
     {
         playerVisible = vision.PlayerInSight;
@@ -382,14 +423,69 @@ public class EnemyMovement : MonoBehaviour
 
         if (playerVisible)
         {
-            lastSeenPosition = player.position;
+            lastSeenPosition = SnapToGrid(player.position);
         }
         else if (FlatDistance(transform.position, lastSeenPosition) <= stopAtDistance)
         {
-            state = State.Patrol;
-            moveSpeed = patrolSpeed;
-            alertProgress = 0f;
-            hasCalledBackup = false;
+            // Reached where we last saw the player and found nothing
+            EndChase();
+        }
+    }
+
+    // Rounds a position to the nearest grid cell. The enemy only ever stands on cell centers,
+    // so a target that isn't on one can never be reached (it would just bounce around it).
+    Vector3 SnapToGrid(Vector3 position)
+    {
+        return new Vector3(Mathf.Round(position.x), position.y, Mathf.Round(position.z));
+    }
+
+    // Back to patrolling
+    void EndChase()
+    {
+        state = State.Patrol;
+        moveSpeed = patrolSpeed;
+        alertProgress = 0f;
+        hasCalledBackup = false;
+        noProgressTimer = 0f;
+    }
+
+    // Runs every frame while chasing. If the player is out of sight and we aren't getting any
+    // closer to where they were last seen (path blocked, or bouncing around the spot), give up.
+    void CheckChaseProgress()
+    {
+        if (state != State.Chase) return;
+
+        if (vision.PlayerInSight)
+        {
+            noProgressTimer = 0f;
+            return;
+        }
+
+        // New target: start measuring again
+        if (lastSeenPosition != progressTarget)
+        {
+            progressTarget = lastSeenPosition;
+            bestDistance = Mathf.Infinity;
+            noProgressTimer = 0f;
+        }
+
+        float distance = FlatDistance(transform.position, lastSeenPosition);
+
+        if (distance < bestDistance - 0.5f)
+        {
+            // Got at least half a cell closer
+            bestDistance = distance;
+            noProgressTimer = 0f;
+        }
+        else
+        {
+            noProgressTimer += Time.deltaTime;
+        }
+
+        if (noProgressTimer >= giveUpTime)
+        {
+            Debug.Log(name + " gave up the search");
+            EndChase();
         }
     }
 
@@ -398,8 +494,7 @@ public class EnemyMovement : MonoBehaviour
         if (isWaiting || patrolPoints.Length == 0) return;
 
         // Rounds the patrol point to the nearest grid cell
-        Vector3 point = patrolPoints[currentPatrolIndex].position;
-        Vector3 target = new Vector3(Mathf.Round(point.x), point.y, Mathf.Round(point.z));
+        Vector3 target = SnapToGrid(patrolPoints[currentPatrolIndex].position);
 
         if (FlatDistance(transform.position, target) <= stopAtDistance)
         {
@@ -601,7 +696,7 @@ public class EnemyMovement : MonoBehaviour
 
         if (Physics.Raycast(origin, direction, out hit, distance))
         {
-            if (hit.collider.CompareTag("Wall") || hit.collider.CompareTag("Door")) 
+            if (hit.collider.CompareTag("Wall") || hit.collider.CompareTag("Door"))
             {
                 return false;
             }

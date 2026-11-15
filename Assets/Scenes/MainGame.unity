@@ -7418,6 +7418,10 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 952898023}
     - target: {fileID: 389649255750865377, guid: 5258aeeaca0dda449bd286e6cfb7697c, type: 3}
+      propertyPath: DetectRange
+      value: 13
+      objectReference: {fileID: 0}
+    - target: {fileID: 389649255750865377, guid: 5258aeeaca0dda449bd286e6cfb7697c, type: 3}
       propertyPath: DetectedText
       value: 
       objectReference: {fileID: 1955007948}

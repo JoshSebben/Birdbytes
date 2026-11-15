@@ -1,6 +1,5 @@
 using UnityEngine;
 using TMPro;
-using Unity.VisualScripting;
 
 public class EnemyVision : MonoBehaviour
 {
@@ -37,22 +36,33 @@ public class EnemyVision : MonoBehaviour
 
         // Hidden
         isNotHidden = false;
-        RaycastHit hit;
-        if (Physics.Raycast(origin, toPlayer.normalized, out hit, DetectRange))
+
+        if (isInRange)
         {
-            if (hit.transform.IsChildOf(Player.transform))
+            RaycastHit[] hits = Physics.RaycastAll(origin, toPlayer.normalized, DetectRange);
+            float closestDistance = Mathf.Infinity;
+
+            foreach (RaycastHit hit in hits)
             {
-                isNotHidden = true;
+                // Skip our own colliders (body, limb, and so on)
+                if (hit.transform.IsChildOf(transform)) continue;
+
+                if (hit.distance < closestDistance)
+                {
+                    closestDistance = hit.distance;
+                    isNotHidden = hit.transform.IsChildOf(Player.transform);
+                }
             }
-
-            PlayerInSight = isInRange && isNotHidden;
-            PlayerDetected = isInRange && isInAngle && isNotHidden;
-
-            SetLabel(RangeText, isInRange ? "In Range" : "Not In Range", isInRange);
-            SetLabel(HiddenText, isNotHidden ? "Not Hidden" : "Hidden", isNotHidden);
-            SetLabel(AngleText, isInAngle ? "In Vision Angle" : "Not In Vision Angle", isInRange);
-            SetLabel(DetectedText, PlayerDetected ? "Player Detected" : "Player Not Detected", PlayerDetected);
         }
+
+        PlayerInSight = isInRange && isNotHidden;
+        PlayerDetected = isInRange && isInAngle && isNotHidden;
+
+        SetLabel(RangeText, isInRange ? "In Range" : "Not In Range", isInRange);
+        SetLabel(HiddenText, isNotHidden ? "Not Hidden" : "Hidden", isNotHidden);
+        SetLabel(AngleText, isInAngle ? "In Vision Angle" : "Not In Vision Angle", isInAngle);
+        SetLabel(DetectedText, PlayerDetected ? "Player Detected" : "Player Not Detected", PlayerDetected);
+
     }
 
     void SetLabel(TMP_Text label, string message, bool alert)

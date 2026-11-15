@@ -20,6 +20,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: EnemyMid
       objectReference: {fileID: 0}
+    - target: {fileID: 4865443798341067717, guid: 87b904621d895124a860c5cd262d4a04, type: 3}
+      propertyPath: DetectRange
+      value: 15
+      objectReference: {fileID: 0}
     - target: {fileID: 6413760709944411251, guid: 87b904621d895124a860c5cd262d4a04, type: 3}
       propertyPath: rank
       value: 1

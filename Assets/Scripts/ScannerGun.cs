@@ -25,12 +25,10 @@ public class ScannerGun : MonoBehaviour
         scanPanel.SetActive(false);
     }
 
-    // Update is called once per frame
     void Update()
     {
         ScannableEnemy target = FindEnemyToScan();
 
-        // Target changed or went away: cancel any scan in progress
         if (target != currentTarget)
         {
             currentTarget = target;
@@ -48,7 +46,7 @@ public class ScannerGun : MonoBehaviour
         // Already scanned this type of enemy, so don't scan again
         if (ScanDatabase.HasScanned(currentTarget.enemyID))
         {
-            promptText.text = currentTarget.enemyID + " scanned";
+            promptText.text = currentTarget.enemyID + " scanned - " + RankNames.GetName(currentTarget.GetRank()) + " access";
             progressBar.fillAmount = 1f;
             return;
         }
@@ -61,7 +59,8 @@ public class ScannerGun : MonoBehaviour
             if (scanProgress >= 1f)
             {
                 ScanDatabase.AddScan(currentTarget.enemyID);
-                Debug.Log("Scanned " + currentTarget.enemyID);
+                ScanDatabase.UnlockRank(currentTarget.GetRank());
+                Debug.Log("Scanned " + currentTarget.enemyID + ", unlocked " + currentTarget.GetRank() + " access");
             }
         }
         else

@@ -29,4 +29,9 @@ public class ScannableEnemy : MonoBehaviour
     {
         return movement.IsChasing();
     }
+
+    public EnemyRank GetRank()
+    {
+        return movement.rank;
+    }
 }
